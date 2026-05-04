@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>電気振動シミュレーション</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #ffffff;
+            color: #333333;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            overflow-y: auto;
+            touch-action: auto;
+        }
+
+        .canvas-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+            box-sizing: border-box;
+            background-color: #f0f0f0;
+        }
+
+        canvas {
+            max-width: 100%;
+            max-height: 65vh; /* キャンバスの最大高さを55vhから65vhに拡大 */
+            object-fit: contain;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            background-color: #ffffff;
+            border: 1px solid #ccc;
+        }
+
+        .panel {
+            width: 100%;
+            background-color: #fafafa;
+            padding: 20px;
+            box-sizing: border-box;
+            border-top: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            flex: 1;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #ccc;
+            padding-bottom: 10px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .panel-header h1 {
+            font-size: 1.2rem;
+            margin: 0;
+            color: #2e7d32;
+            border: none;
+            padding: 0;
+        }
+
+        .header-controls {
+            display: flex;
+            flex-direction: row;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .panel-body {
+            display: flex;
+            flex-direction: row;
+            gap: 20px;
+        }
+
+        .panel-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-width: 300px;
+        }
+
+        .panel-section-controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px 20px;
+        }
+
+        .section-title {
+            background-color: #e0e0e0;
+            padding: 6px 10px;
+            font-weight: bold;
+            font-size: 0.95rem;
+            border-left: 5px solid #4CAF50;
+            margin-top: 5px;
+            color: #333;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .control-group label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .control-group span.value {
+            color: #2e7d32;
+            font-family: monospace;
+            font-size: 1.05rem;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            margin: 0;
+            accent-color: #4CAF50;
+            height: 36px;
+        }
+
+        .btn {
+            padding: 12px;
+            background-color: #e0e0e0;
+            color: #333;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: bold;
+            transition: all 0.2s;
+            touch-action: manipulation;
+        }
+
+        .btn:hover {
+            background-color: #d5d5d5;
+        }
+
+        .btn-primary {
+            background-color: #1976D2;
+            color: white;
+            border-color: #1565C0;
+        }
+
+        .btn-primary:hover {
+            background-color: #115293;
+        }
+
+        .btn-action {
+            background-color: #F57C00;
+            color: white;
+            border-color: #E65100;
+        }
+
+        .btn-action:hover {
+            background-color: #E65100;
+        }
+
+        .data-display {
+            background-color: #ffffff;
+            padding: 10px 12px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9rem;
+            color: #333;
+            display: flex;
+            flex-direction: row;
+            justify-content: space-around;
+            gap: 15px;
+        }
+
+        .data-display div {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        #portrait-warning {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .panel-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .panel-body {
+                flex-direction: column;
+            }
+            .panel-section-controls {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (orientation: portrait) {
+            #portrait-warning {
+                display: flex;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0, 0, 0, 0.9);
+                z-index: 1000;
+                justify-content: center;
+                align-items: center;
+                text-align: center;
+                font-size: 1.5rem;
+                font-weight: bold;
+                padding: 20px;
+                box-sizing: border-box;
+                color: #fff;
+            }
+        }
+
+        /* --- 解説モーダル用のスタイル追加 --- */
+        .modal {
+            display: none; 
+            position: fixed; 
+            z-index: 2000; 
+            left: 0;
+            top: 0;
+            width: 100%; 
+            height: 100%; 
+            overflow: auto; 
+            background-color: rgba(0,0,0,0.6); 
+            backdrop-filter: blur(3px);
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 10% auto; 
+            padding: 30px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 600px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .close-btn {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close-btn:hover,
+        .close-btn:focus {
+            color: #000;
+            text-decoration: none;
+        }
+
+        .frac {
+            display: inline-block;
+            vertical-align: middle;
+            text-align: center;
+            font-size: 0.9em;
+            margin: 0 0.2em;
+        }
+        .frac > span {
+            display: block;
+            padding: 0.1em;
+        }
+        .frac > span.bottom {
+            border-top: thin solid black;
+        }
+    </style>
+</head>
+<body>
+    <div id="portrait-warning">
+        端末を横向きにして<br>ご使用ください
+    </div>
+
+    <div class="canvas-wrapper">
+        <canvas id="simCanvas"></canvas>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header">
+            <div style="display: flex; align-items: baseline; gap: 15px; flex-wrap: wrap;">
+                <h1>電気振動シミュレーション</h1>
+                <span style="font-size: 1.1rem; color: #555; display: flex; align-items: center; gap: 5px;">
+                    <span style="font-weight: bold;">理論周期: </span>
+                    <span style="font-family: 'Times New Roman', Times, serif; font-size: 1.25rem;">
+                        <i>T</i> = 2&pi;<span style="white-space: nowrap;">&radic;<span style="text-decoration: overline; padding-top: 2px;"><i>LC</i></span></span>
+                    </span>
+                    <span id="btnExplanation" style="font-size: 0.85rem; color: #1976D2; text-decoration: underline; cursor: pointer; margin-left: 8px;">解説を表示</span>
+                </span>
+            </div>
+            <div class="header-controls">
+                <button class="btn btn-action" id="btnSwitch">全スイッチを「b (振動)」へ</button>
+                <button class="btn btn-primary" id="btnPause">一時停止</button>
+            </div>
+        </div>
+
+        <div class="panel-body">
+            <!-- ================= 左側 (A) ================= -->
+            <div class="panel-section">
+                <div class="section-title" style="border-left-color: #e53935;">【左側】の条件 (赤色)</div>
+                
+                <div class="panel-section-controls">
+                    <div class="control-group">
+                        <label>電源電圧 V₀ <span class="value"><span id="valV0_A">5</span> V</span></label>
+                        <input type="range" id="sliderV0_A" min="1" max="10" step="1" value="5">
+                    </div>
+                    <div class="control-group">
+                        <label>電気容量 C <span class="value"><span id="valC_A">50</span> μF</span></label>
+                        <input type="range" id="sliderC_A" min="10" max="200" step="10" value="50">
+                    </div>
+                    <div class="control-group">
+                        <label>自己インダクタンス L <span class="value"><span id="valL_A">50</span> mH</span></label>
+                        <input type="range" id="sliderL_A" min="10" max="200" step="10" value="50">
+                    </div>
+                    <div class="control-group">
+                        <label>回路の抵抗 R <span class="value"><span id="valR_A">5</span> Ω</span></label>
+                        <input type="range" id="sliderR_A" min="0" max="50" step="1" value="5">
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= 右側 (B) ================= -->
+            <div class="panel-section">
+                <div class="section-title" style="border-left-color: #1e88e5;">【右側】の条件 (青色)</div>
+                
+                <div class="panel-section-controls">
+                    <div class="control-group">
+                        <label>電源電圧 V₀ <span class="value"><span id="valV0_B">5</span> V</span></label>
+                        <input type="range" id="sliderV0_B" min="1" max="10" step="1" value="5">
+                    </div>
+                    <div class="control-group">
+                        <label>電気容量 C <span class="value"><span id="valC_B">50</span> μF</span></label>
+                        <input type="range" id="sliderC_B" min="10" max="200" step="10" value="50">
+                    </div>
+                    <div class="control-group">
+                        <label>自己インダクタンス L <span class="value"><span id="valL_B">50</span> mH</span></label>
+                        <input type="range" id="sliderL_B" min="10" max="200" step="10" value="50">
+                    </div>
+                    <div class="control-group">
+                        <label>回路の抵抗 R <span class="value"><span id="valR_B">5</span> Ω</span></label>
+                        <input type="range" id="sliderR_B" min="0" max="50" step="1" value="5">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- --- 解説モーダルのHTML --- -->
+    <div id="explanationModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2 style="color: #2e7d32; border-bottom: 2px solid #ccc; padding-bottom: 10px; margin-top: 0;">電気振動の理論式について</h2>
+            <p>コイルの自己インダクタンスを <i style="font-family: 'Times New Roman', Times, serif;">L</i>、コンデンサーの電気容量を <i style="font-family: 'Times New Roman', Times, serif;">C</i>、蓄えられる電荷を <i style="font-family: 'Times New Roman', Times, serif;">q</i>、回路を流れる電流を <i style="font-family: 'Times New Roman', Times, serif;">i</i> とします。</p>
+            <p>抵抗を無視できる理想的な回路を考えた場合、キルヒホッフの第2法則（閉回路の電位降下の和はゼロ）より以下の関係が成り立ちます。</p>
+            <div style="text-align: center; font-family: 'Times New Roman', Times, serif; font-size: 1.1rem; margin: 15px 0;">
+                <i>L</i> 
+                <span class="frac">
+                    <span><i>di</i></span>
+                    <span class="bottom"><i>dt</i></span>
+                </span>
+                +
+                <span class="frac">
+                    <span>1</span>
+                    <span class="bottom"><i>C</i></span>
+                </span>
+                <i>q</i> = 0
+            </div>
+            <p>電流 <i style="font-family: 'Times New Roman', Times, serif;">i</i> は電荷 <i style="font-family: 'Times New Roman', Times, serif;">q</i> の時間変化率（<i style="font-family: 'Times New Roman', Times, serif;">i = dq/dt</i>）であるため、これを代入して整理すると以下のようになります。</p>
+            <div style="text-align: center; font-family: 'Times New Roman', Times, serif; font-size: 1.1rem; margin: 15px 0;">
+                <span class="frac">
+                    <span><i>d</i><sup>2</sup><i>q</i></span>
+                    <span class="bottom"><i>dt</i><sup>2</sup></span>
+                </span>
+                = &minus;
+                <span class="frac">
+                    <span>1</span>
+                    <span class="bottom"><i>LC</i></span>
+                </span>
+                <i>q</i>
+            </div>
+            <p>この式は、加速度が変位に比例する<b>「単振動」</b>の方程式（<i>a = &minus;&omega;<sup>2</sup>x</i>）と全く同じ形をしています。したがって、角振動数を <i style="font-family: 'Times New Roman', Times, serif;">&omega;</i> とすると：</p>
+            <div style="text-align: center; font-family: 'Times New Roman', Times, serif; font-size: 1.1rem; margin: 15px 0;">
+                <i>&omega;</i><sup>2</sup> = 
+                <span class="frac">
+                    <span>1</span>
+                    <span class="bottom"><i>LC</i></span>
+                </span>
+                　よって　
+                <i>&omega;</i> = 
+                <span class="frac">
+                    <span>1</span>
+                    <span class="bottom">&radic;<span style="text-decoration: overline; padding-top: 2px;"><i>LC</i></span></span>
+                </span>
+            </div>
+            <p>単振動の周期 <i style="font-family: 'Times New Roman', Times, serif;">T</i> は <i style="font-family: 'Times New Roman', Times, serif;">T = 2&pi;/&omega;</i> で求められるため、最終的に以下の理論式が導かれます。</p>
+            <div style="text-align: center; font-family: 'Times New Roman', Times, serif; font-size: 1.4rem; font-weight: bold; margin: 20px 0; color: #d32f2f;">
+                <i>T</i> = 2&pi;&radic;<span style="text-decoration: overline; padding-top: 2px;"><i>LC</i></span>
+            </div>
+            <p style="font-size: 0.85rem; color: #666; border-top: 1px dashed #ccc; padding-top: 10px;">※今回のシミュレーションでは抵抗 <i style="font-family: 'Times New Roman', Times, serif;">R</i> が含まれているため、厳密には「減衰振動」となり、周期は理論値よりもわずかに長くなります。</p>
+        </div>
+    </div>
+
+    <script>
+        // --- Canvasの初期設定 ---
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        // PCやiPad向けに横長のキャンバスに変更 (左右1000pxずつ)
+        const CANVAS_WIDTH = 2000;
+        const CANVAS_HEIGHT = 850; // 下部が見切れないように 800 から 850 に拡大
+
+        function initCanvas() {
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = CANVAS_WIDTH * dpr;
+            canvas.height = CANVAS_HEIGHT * dpr;
+            ctx.scale(dpr, dpr);
+        }
+        initCanvas();
+
+        // --- 物理パラメータと状態変数 ---
+        const TIME_SCALE = 0.005; 
+        const GRAPH_WINDOW_TIME = 0.100; 
+
+        let isPlaying = true;
+        let switchState = 'a'; 
+        let simTime = 0;
+
+        class CircuitState {
+            constructor() {
+                this.V0 = 5;       
+                this.C_uF = 50;    
+                this.L_mH = 50;    
+                this.R = 5;        
+                
+                this.C = this.C_uF * 1e-6;
+                this.L = this.L_mH * 1e-3;
+                
+                this.q = this.C * this.V0;
+                this.i = 0;        
+                
+                this.historyData = [{ t: 0, v: this.V0 }];
+                
+                // 周期測定用
+                this.measuredT = null; 
+                this.crossCount = 0;   
+            }
+
+            updateParams() {
+                this.C = this.C_uF * 1e-6;
+                this.L = this.L_mH * 1e-3;
+            }
+
+            reset() {
+                this.q = this.C * this.V0;
+                this.i = 0;
+                this.historyData = [{ t: 0, v: this.V0 }];
+                
+                this.measuredT = null;
+                this.crossCount = 0;
+            }
+        }
+
+        const stateA = new CircuitState();
+        const stateB = new CircuitState();
+
+        // --- モーダルの開閉処理 ---
+        const btnExplanation = document.getElementById('btnExplanation');
+        const explanationModal = document.getElementById('explanationModal');
+        const closeModalBtn = document.querySelector('.close-btn');
+
+        btnExplanation.addEventListener('click', () => {
+            explanationModal.style.display = 'block';
+        });
+
+        closeModalBtn.addEventListener('click', () => {
+            explanationModal.style.display = 'none';
+        });
+
+        window.addEventListener('click', (event) => {
+            if (event.target === explanationModal) {
+                explanationModal.style.display = 'none';
+            }
+        });
+
+        // --- UI要素のイベントリスナー ---
+        const btnSwitch = document.getElementById('btnSwitch');
+        const btnPause = document.getElementById('btnPause');
+
+        function bindEvents(state, suffix) {
+            const sliderV0 = document.getElementById('sliderV0_' + suffix);
+            const sliderC = document.getElementById('sliderC_' + suffix);
+            const sliderL = document.getElementById('sliderL_' + suffix);
+            const sliderR = document.getElementById('sliderR_' + suffix);
+
+            const valV0 = document.getElementById('valV0_' + suffix);
+            const valC = document.getElementById('valC_' + suffix);
+            const valL = document.getElementById('valL_' + suffix);
+            const valR = document.getElementById('valR_' + suffix);
+
+            sliderV0.addEventListener('input', (e) => {
+                state.V0 = parseFloat(e.target.value);
+                valV0.innerText = state.V0;
+                if (switchState === 'a') state.q = state.C * state.V0;
+            });
+
+            sliderC.addEventListener('input', (e) => {
+                state.C_uF = parseFloat(e.target.value);
+                state.updateParams();
+                valC.innerText = state.C_uF;
+                if (switchState === 'a') state.q = state.C * state.V0;
+            });
+
+            sliderL.addEventListener('input', (e) => {
+                state.L_mH = parseFloat(e.target.value);
+                state.updateParams();
+                valL.innerText = state.L_mH;
+            });
+
+            sliderR.addEventListener('input', (e) => {
+                state.R = parseFloat(e.target.value);
+                valR.innerText = state.R;
+            });
+        }
+
+        bindEvents(stateA, 'A');
+        bindEvents(stateB, 'B');
+
+        btnSwitch.addEventListener('click', () => {
+            if (switchState === 'a') {
+                switchState = 'b';
+                btnSwitch.innerText = '全スイッチを「a (充電)」へ';
+                btnSwitch.classList.remove('btn-action');
+                btnSwitch.style.backgroundColor = '#d32f2f'; // 赤系
+                btnSwitch.style.color = '#fff';
+                
+                isPlaying = true;
+                btnPause.innerText = '一時停止';
+                btnPause.disabled = false;
+                btnPause.style.backgroundColor = '#1976D2';
+            } else {
+                switchState = 'a';
+                btnSwitch.innerText = '全スイッチを「b (振動)」へ';
+                btnSwitch.classList.add('btn-action');
+                btnSwitch.style.backgroundColor = '';
+                
+                // 初期化
+                simTime = 0;
+                stateA.reset();
+                stateB.reset();
+
+                isPlaying = true;
+                btnPause.innerText = '一時停止';
+                btnPause.disabled = false;
+                btnPause.style.backgroundColor = '#1976D2';
+            }
+        });
+
+        btnPause.addEventListener('click', () => {
+            isPlaying = !isPlaying;
+            btnPause.innerText = isPlaying ? '一時停止' : '再生';
+            btnPause.style.backgroundColor = isPlaying ? '#1976D2' : '#4CAF50';
+        });
+
+        // --- 物理演算の更新 ---
+        function updatePhysics(dt_real_ms) {
+            if (!isPlaying) return;
+
+            if (switchState === 'a') {
+                simTime = 0;
+                stateA.reset();
+                stateB.reset();
+            } else if (switchState === 'b') {
+                let dt_sim = (dt_real_ms / 1000) * TIME_SCALE;
+                let steps = 20; 
+                let h = dt_sim / steps;
+                
+                for (let step = 0; step < steps; step++) {
+                    // Aの更新
+                    let prev_i_A = stateA.i;
+                    let di_dt_A = (- stateA.R * stateA.i + (stateA.q / stateA.C)) / stateA.L;
+                    stateA.i += di_dt_A * h;
+                    stateA.q += (-stateA.i) * h;
+                    
+                    // 電流のゼロクロス検知 (A)
+                    if (prev_i_A > 1e-6 && stateA.i <= 1e-6) {
+                        if (stateA.crossCount === 0) stateA.crossCount = 1; // 半周期
+                    } else if (prev_i_A < -1e-6 && stateA.i >= -1e-6) {
+                        if (stateA.crossCount === 1) {
+                            stateA.crossCount = 2; // 1周期完了
+                            stateA.measuredT = simTime;
+                        }
+                    }
+
+                    // Bの更新
+                    let prev_i_B = stateB.i;
+                    let di_dt_B = (- stateB.R * stateB.i + (stateB.q / stateB.C)) / stateB.L;
+                    stateB.i += di_dt_B * h;
+                    stateB.q += (-stateB.i) * h;
+
+                    // 電流のゼロクロス検知 (B)
+                    if (prev_i_B > 1e-6 && stateB.i <= 1e-6) {
+                        if (stateB.crossCount === 0) stateB.crossCount = 1; // 半周期
+                    } else if (prev_i_B < -1e-6 && stateB.i >= -1e-6) {
+                        if (stateB.crossCount === 1) {
+                            stateB.crossCount = 2; // 1周期完了
+                            stateB.measuredT = simTime;
+                        }
+                    }
+
+                    simTime += h;
+                }
+
+                // 履歴保存
+                let lastRecordTime = stateA.historyData.length > 0 ? stateA.historyData[stateA.historyData.length - 1].t : -1;
+                if (simTime - lastRecordTime >= 0.0001) {
+                    stateA.historyData.push({ t: simTime, v: stateA.q / stateA.C });
+                    stateB.historyData.push({ t: simTime, v: stateB.q / stateB.C });
+                }
+
+                // 減衰判定 (A・B共に減衰したら終了)
+                let energyA = 0.5 * stateA.C * Math.pow(stateA.q / stateA.C, 2) + 0.5 * stateA.L * Math.pow(stateA.i, 2);
+                let initialA = 0.5 * stateA.C * Math.pow(stateA.V0, 2);
+                let energyB = 0.5 * stateB.C * Math.pow(stateB.q / stateB.C, 2) + 0.5 * stateB.L * Math.pow(stateB.i, 2);
+                let initialB = 0.5 * stateB.C * Math.pow(stateB.V0, 2);
+
+                if (simTime > 0.01 && energyA < initialA * 1e-4 && energyB < initialB * 1e-4) {
+                    isPlaying = false;
+                    btnPause.innerText = '実験終了';
+                    btnPause.disabled = true;
+                    btnPause.style.backgroundColor = '#999';
+                    stateA.q = 0; stateA.i = 0;
+                    stateB.q = 0; stateB.i = 0;
+                }
+            }
+        }
+
+        // offsetX と offsetY を使って描画位置を制御
+        function drawCircuit(state, offsetX, offsetY, waveColor) {
+            ctx.save();
+            ctx.translate(offsetX, offsetY);
+
+            ctx.lineWidth = 5; // 導線を少し太く
+            ctx.strokeStyle = '#333333';
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            // --- 導線の描画 ---
+            ctx.beginPath();
+            ctx.moveTo(120, 200); ctx.lineTo(280, 200); ctx.lineTo(280, 150);
+            ctx.moveTo(120, 200); ctx.lineTo(120, 315); 
+            ctx.moveTo(120, 335); ctx.lineTo(120, 450); 
+            ctx.moveTo(120, 450); ctx.lineTo(450, 450);
+
+            ctx.moveTo(450, 450); ctx.lineTo(450, 330);
+            ctx.moveTo(450, 270); ctx.lineTo(450, 200);
+
+            ctx.moveTo(620, 150); ctx.lineTo(820, 150); ctx.lineTo(820, 200);
+            ctx.moveTo(820, 400); ctx.lineTo(820, 450); ctx.lineTo(665, 450); 
+            ctx.moveTo(605, 450); ctx.lineTo(450, 450); 
+
+            ctx.moveTo(450, 235); ctx.lineTo(280, 235); ctx.lineTo(280, 300);
+            ctx.moveTo(280, 350); ctx.lineTo(280, 415); ctx.lineTo(450, 415);
+            ctx.stroke();
+
+            // --- コンポーネントの描画 ---
+            
+            // 1. 電源
+            ctx.beginPath();
+            ctx.lineWidth = 6;
+            ctx.strokeStyle = '#FBC02D';
+            ctx.moveTo(90, 315); ctx.lineTo(150, 315); // 少し長く
+            ctx.moveTo(105, 335); ctx.lineTo(135, 335); 
+            ctx.stroke();
+            ctx.fillStyle = '#FBC02D';
+            ctx.font = 'bold 28px sans-serif'; // 文字を大きく
+            ctx.fillText('V₀', 50, 335);
+
+            // 2. 電圧計
+            ctx.beginPath();
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#333333';
+            ctx.fillStyle = '#ffffff';
+            ctx.arc(280, 325, 30, 0, Math.PI*2); // 円を大きく
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = '#333333';
+            ctx.font = 'bold 28px sans-serif'; // 文字を大きく
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('V', 280, 328);
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'alphabetic';
+
+            // 3. コンデンサー
+            ctx.beginPath();
+            ctx.lineWidth = 8; // 極板を太く
+            ctx.strokeStyle = '#0288D1';
+            ctx.moveTo(340, 270); ctx.lineTo(560, 270); // 極板を長く
+            ctx.moveTo(340, 330); ctx.lineTo(560, 330); 
+            ctx.stroke();
+            ctx.fillStyle = '#0288D1';
+            ctx.font = 'bold 28px sans-serif'; // 文字を大きく
+            ctx.fillText('C', 580, 310);
+
+            // コンデンサーの極板の電荷表示
+            let maxQ_disp = state.C_uF * 1e-6 * 10; 
+            let qRatio = state.q / maxQ_disp;
+            let absRatio = Math.abs(qRatio);
+            
+            let chargeCount = 0;
+            if (absRatio > 0.01) { 
+                chargeCount = Math.max(1, Math.round(absRatio * 10));
+                chargeCount = Math.min(10, chargeCount);
+            }
+            
+            ctx.font = 'bold 30px monospace'; // 記号を大きく太く
+            ctx.textAlign = 'center';
+
+            // --- 上極板の描画 ---
+            ctx.fillStyle = qRatio > 0 ? '#d32f2f' : '#1976D2';
+            for(let j=0; j<chargeCount; j++){
+                let px = 450 - (chargeCount-1)*12 + j * 24; // 間隔を広げる
+                ctx.fillText(qRatio > 0 ? '+' : '-', px, 255);
+            }
+
+            // --- 下極板の描画 ---
+            ctx.fillStyle = qRatio > 0 ? '#1976D2' : '#d32f2f';
+            for(let j=0; j<chargeCount; j++){
+                let px = 450 - (chargeCount-1)*12 + j * 24;
+                ctx.fillText(qRatio > 0 ? '-' : '+', px, 363);
+            }
+            ctx.textAlign = 'left';
+
+            // 4. コイル
+            ctx.beginPath();
+            ctx.lineWidth = 6; // 線を太く
+            ctx.strokeStyle = '#F57C00';
+            let turns = 4;
+            let dy = 200 / turns; 
+            ctx.moveTo(820, 200);
+            for(let j=0; j<turns; j++){
+                let cy = 200 + dy * j + dy/2;
+                ctx.arc(820, cy, dy/2, -Math.PI/2, Math.PI/2, false);
+            }
+            ctx.stroke();
+            ctx.fillStyle = '#F57C00';
+            ctx.font = 'bold 28px sans-serif'; // 文字を大きく
+            ctx.fillText('L', 880, 310);
+
+            // 5. スイッチ
+            ctx.fillStyle = '#333333';
+            ctx.beginPath(); ctx.arc(280, 150, 9, 0, Math.PI*2); ctx.fill(); // 接点の丸を大きく
+            ctx.beginPath(); ctx.arc(620, 150, 9, 0, Math.PI*2); ctx.fill(); 
+            ctx.beginPath(); ctx.arc(450, 200, 9, 0, Math.PI*2); ctx.fill(); 
+            
+            ctx.font = 'bold 22px sans-serif'; // 文字を大きく
+            ctx.fillText('a', 265, 130);
+            ctx.fillText('b', 615, 130);
+            ctx.fillText('S', 470, 195);
+
+            ctx.beginPath();
+            ctx.lineWidth = 6; // 接点の線を太く
+            ctx.strokeStyle = '#333333';
+            ctx.moveTo(450, 200);
+            if (switchState === 'a') ctx.lineTo(285, 155);
+            else ctx.lineTo(615, 155);
+            ctx.stroke();
+
+            // 6. 抵抗 (ギザギザ記号)
+            ctx.beginPath();
+            ctx.lineWidth = 6; // 線を太く
+            ctx.strokeStyle = '#8D6E63'; 
+            ctx.lineJoin = 'miter';
+            ctx.moveTo(605, 450);
+            ctx.lineTo(612.5, 430); // ギザギザの振幅を大きく
+            ctx.lineTo(627.5, 470);
+            ctx.lineTo(642.5, 430);
+            ctx.lineTo(657.5, 470);
+            ctx.lineTo(665, 450);
+            ctx.stroke();
+            ctx.lineJoin = 'round'; 
+            
+            ctx.fillStyle = '#8D6E63';
+            ctx.font = 'bold 28px sans-serif'; // 文字を大きく
+            ctx.fillText('R', 620, 510);
+
+            ctx.restore();
+        }
+
+        function drawOscilloscope(state, offsetX, offsetY, waveColor, title) {
+            ctx.save();
+            ctx.translate(offsetX, offsetY);
+
+            // 軸タイトル・目盛り用に余白を広めにとる
+            let ox = 130;
+            let oy = 510;
+            let ow = 820;
+            let oh = 240;
+            
+            ctx.fillStyle = '#fafafa';
+            ctx.fillRect(ox, oy, ow, oh);
+            
+            // グリッド線
+            ctx.strokeStyle = '#e0e0e0';
+            ctx.lineWidth = 2; // グリッドも少し太く
+            ctx.beginPath();
+            for(let j=1; j<10; j++){ 
+                ctx.moveTo(ox + ow * j / 10, oy);
+                ctx.lineTo(ox + ow * j / 10, oy + oh);
+            }
+            for(let j=1; j<8; j++){  
+                ctx.moveTo(ox, oy + oh * j / 8);
+                ctx.lineTo(ox + ow, oy + oh * j / 8);
+            }
+            ctx.stroke();
+            
+            // 枠線
+            ctx.strokeStyle = '#cccccc';
+            ctx.lineWidth = 3; // 枠を太く
+            ctx.strokeRect(ox, oy, ow, oh);
+            
+            // 中心線（電圧0V）
+            ctx.strokeStyle = '#888888';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(ox, oy + oh / 2);
+            ctx.lineTo(ox + ow, oy + oh / 2);
+            ctx.stroke();
+
+            // --- 目盛り数値の描画 ---
+            ctx.fillStyle = '#666666';
+            ctx.font = 'bold 20px sans-serif'; // 目盛りを大きく
+            
+            // 縦軸
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('10', ox - 10, oy);
+            ctx.fillText('0', ox - 10, oy + oh / 2);
+            ctx.fillText('-10', ox - 10, oy + oh);
+
+            // 横軸
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillText('0', ox, oy + oh + 12);
+            ctx.fillText('100', ox + ow, oy + oh + 12);
+
+            // --- 軸タイトルの描画 ---
+            ctx.fillStyle = '#333333';
+            ctx.font = 'bold 24px sans-serif'; // 軸タイトルを大きく
+
+            // 縦軸 (回転して左外側に配置)
+            ctx.save();
+            ctx.translate(ox - 65, oy + oh / 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('電圧 V', 0, 0);
+            ctx.restore();
+
+            // 横軸 (下外側に配置)
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillText('時間 t [ms]', ox + ow / 2, oy + oh + 35);
+            
+            // アライメントを戻す
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'alphabetic';
+
+            // グラフタイトル
+            ctx.fillStyle = waveColor;
+            ctx.font = 'bold 26px sans-serif'; // タイトルを大きく
+            ctx.fillText(title, ox - 30, oy - 20);
+
+            // --- リアルタイム数値の描画（グラフ内） ---
+            // 1周期完了時に数値をパッと表示 (グラフ内右上)
+            if (state.measuredT !== null) {
+                ctx.fillStyle = waveColor;
+                ctx.font = 'bold 28px sans-serif'; // 文字を大きく
+                ctx.textAlign = 'right';
+                ctx.fillText(`実測周期 T: ${(state.measuredT * 1000).toFixed(2)} ms`, ox + ow - 20, oy + 40);
+                ctx.textAlign = 'left';
+            }
+
+            // リアルタイムの時間 t (グラフ内右下)
+            ctx.fillStyle = '#555555';
+            ctx.font = 'bold 24px monospace'; // 文字を大きく
+            ctx.textAlign = 'right';
+            ctx.fillText(`t: ${(simTime * 1000).toFixed(2)} ms`, ox + ow - 20, oy + oh / 2 + 40);
+            ctx.textAlign = 'left';
+
+            // --- 波形の描画 ---
+            if (state.historyData.length >= 2) {
+                let maxV = 10; 
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(ox, oy, ow, oh);
+                ctx.clip();
+                
+                ctx.strokeStyle = waveColor;
+                ctx.lineWidth = 5; // 波形を太く
+                ctx.lineJoin = 'round';
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                
+                let t_start = 0; 
+                
+                for (let j = 0; j < state.historyData.length; j++) {
+                    let d = state.historyData[j];
+                    let x = ox + ((d.t - t_start) / GRAPH_WINDOW_TIME) * ow;
+                    let y = (oy + oh / 2) - (d.v / maxV) * (oh / 2);
+                    
+                    if (j === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            ctx.restore();
+        }
+
+        let lastTime = performance.now();
+
+        function loop(now) {
+            let dt = now - lastTime;
+            lastTime = now;
+            
+            if (dt > 100) dt = 16; 
+
+            updatePhysics(dt);
+
+            ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+            // 左側の描画 (A: オフセットX=0, 波形=赤)
+            drawCircuit(stateA, 0, 0, '#e53935');
+            drawOscilloscope(stateA, 0, 0, '#e53935', '【左側】の波形');
+
+            // 右側の描画 (B: オフセットX=1000, 波形=青)
+            drawCircuit(stateB, 1000, 0, '#1e88e5');
+            drawOscilloscope(stateB, 1000, 0, '#1e88e5', '【右側】の波形');
+            
+            // 区切り線 (中央の縦線)
+            ctx.beginPath();
+            ctx.moveTo(1000, 0);
+            ctx.lineTo(1000, CANVAS_HEIGHT);
+            ctx.strokeStyle = '#bbbbbb';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            
+            requestAnimationFrame(loop);
+        }
+
+        requestAnimationFrame(loop);
+
+    </script>
+</body>
+</html>
